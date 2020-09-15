@@ -211,16 +211,13 @@ def crossover(parents, blame_avgs, blame_devs):
     offspring['dimension'] = int(np.clip(offspring['dimension'], 1, max_dim))
     return offspring
 
-# attempt to replicate a given target topology by using a genetic algorithm
-#   to optimize the parameters of the generative model to match it
-def replicate(
+# attempt to achieve a set of target stats by using a genetic algorithm
+#   to optimize the parameters of the generative model to match
+def imitate(
     target, defaults = None, population = [],
     min_pop = 5, max_pop = 100, champion = (1, 0.02),
     generations = 200, readout = plt_readout
 ):
-    target = nx.Graph(max(nx.connected_component_subgraphs(target), key=len))
-    if defaults == None: defaults = find_defaults(target)
-    target = metric_signature(target)
     # synthesize an intitial population
     while len(population) < min_pop:
         population.append(grow(defaults, synthesize(), target))
@@ -255,3 +252,14 @@ def replicate(
                 t = time.time()
     except: pass # on error, we just dump the population db so nothing is lost
     return population
+
+# attempt to replicate a specific target topology
+def replicate(target, **params):
+    target = nx.Graph(max(nx.connected_component_subgraphs(target), key=len))
+    defaults = find_defaults(target)
+    target = metric_signature(target)
+    return imitate(target, defaults, **params)
+
+# make another graph like a replica
+def duplicate(target):
+    return model.gen_topology(**find_defaults(target['graph']), **target['params'])

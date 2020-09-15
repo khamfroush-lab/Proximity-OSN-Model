@@ -3,15 +3,18 @@ import numpy as np
 import warnings
 
 def cloud_to_matrix( cloud ):
+    """transform point cloud to proximity matrix"""
     norm = np.array([ np.linalg.norm(cloud, axis=1) ])
     return np.tensordot(cloud, cloud, (1, 1)) / norm / norm.T
 
 def compute_proxs( indices, matrix, exp, scale, floor ):
+    """compute the proximity matrix term"""
     scale = np.cos(scale)
     matrix = np.clip(matrix[indices] - scale, 0, None) / (1 - scale)
     return matrix ** exp + floor
 
 def compute_prefs( indices, degrees, exp ):
+    """compute the preferential attachment matrix term"""
     if np.sum(degrees) == 0:
         matrix = np.zeros((len(indices))) + 1
     else:
@@ -19,6 +22,7 @@ def compute_prefs( indices, degrees, exp ):
     return (matrix / np.max(matrix)) ** exp
 
 def compute_intgs( indices, degrees, exp, boost ):
+    """compute the integration/heterophilic matrix term"""
     numerator = np.maximum( degrees[indices[0]], degrees[indices[1]] ) - 0.5
     denominator = np.minimum( degrees[indices[0]], degrees[indices[1]] ) - 1.0
     boost = (1.0 / boost) ** (1.0 / exp)
@@ -26,6 +30,7 @@ def compute_intgs( indices, degrees, exp, boost ):
     return (matrix / np.max(matrix)) ** exp
 
 def connect_edges(matrix, indices, batch, dmax):
+    """helper to add new edges to the network"""
     # update the adjacency matrix
     matrix[indices[0][batch], indices[1][batch]] = 1
     matrix[indices[1][batch], indices[0][batch]] = 1
@@ -41,6 +46,7 @@ def weighted_link(
     edges, batch_size, degree_max,
     pref_exp, intg_exp, boost
 ):
+    """this is the core loop of the model, where edges accumulate"""
     reflow = 0
     while (edges > 0):
         # compute weights
@@ -66,11 +72,13 @@ def weighted_link(
     return adj_matrix
 
 def gen_topology(
-    nodes, edges,
-    dimension, pref_exp, intg_exp, loner_boost,
-    prox_exp, prox_scale, prox_floor,
-    cloud = None, batch_count = 50, degree_max = None
+    nodes=1000, edges=4000, # size of the network
+    dimension=4, # complexity of the proximity space
+    pref_exp=2.4, intg_exp=0.3, loner_boost=100, # control degree distribution, etc
+    prox_exp=6.0, prox_scale=0.5, prox_floor=1e-5, # control community structure and size
+    cloud=None, batch_count=50, degree_max=None
 ):
+    """generate a topology stochastically from a set of patameters"""
     if degree_max == None: degree_max = int(nodes / 2)
     if cloud == None: cloud = np.random.normal(0, 1, (nodes, dimension))
     batch_size = int(edges / batch_count)
